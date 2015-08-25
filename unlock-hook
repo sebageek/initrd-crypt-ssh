@@ -1,0 +1,35 @@
+#! /bin/sh
+
+prereqs() {
+    echo "$PREREQ"
+}
+
+case "$1" in 
+prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+# Run unlock by default and close the login session afterwards
+cat > "${DESTDIR}/root/.profile" << EOF
+ctrl_c_shell() {
+    # Ctrl-C during .profile appears to mangle terminal settings
+    reset
+	exit 0
+}
+
+echo "Unlocking crypt devices... Type Ctrl-C for a shell."
+trap ctrl_c_shell INT
+source /bin/unlock-crypto-volumes
+trap INT
+EOF
+
+UNLOCK_BIN=/etc/initramfs-tools/bin/unlock-crypto-volumes
+if [ "${UNLOCK}" != "n" ] && [ -e $UNLOCK_BIN ] ; then
+    rm -f ${DESTDIR}/bin/unlock-crypto-volumes
+    copy_exec $UNLOCK_BIN /bin/unlock-crypto-volumes
+fi
+

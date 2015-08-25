@@ -1,0 +1,33 @@
+#!/bin/sh
+# Written by Sebastian Lohff <seba@someserver.de>
+#            Christian Struck <christian@struck.se>
+
+# grab parent shell to close the connection later on
+parentShell="$(ps -o pid,ppid|awk "/^ +$$/ { print \$2 }")"
+
+while [ -e /bin/pidof ] && /bin/pidof askpass > /dev/null; do
+	# Use cryptsetup's askpass utility (reads passphrase, echos it to stdout)
+	#   - ps -o args|awk gets the prompt from askpass
+	#   - result is written into pass fifo
+	/lib/cryptsetup/askpass "$(ps -o args|awk '/askpass/ { sub($1 FS,"" ); print }')" > /lib/cryptsetup/passfifo
+
+	# wait for askpass to reappear (wrong password) or cryptsetup to disappear (correct password)
+	while [ -e /bin/pidof ] && pidof cryptsetup>/dev/null && ! pidof askpass>/dev/null; do
+		echo "Waiting for cryptsetup to unlock volume..."
+		[ -e /bin/sleep ] && sleep 1
+	done
+
+	echo
+done
+
+echo "Your crypto volume has been unlocked!"
+echo "Terminating connection..."
+echo
+
+sleep 1 2>/dev/null
+
+# kill parent shell so ssh closes
+kill -9 $parentShell
+
+exit 0
+
